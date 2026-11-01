@@ -12,9 +12,10 @@ Writes:
 import os
 from datetime import datetime
 
-# Always use the pip-installed pyspark (3.5.1), even if a different Spark
-# is installed system-wide and SPARK_HOME points to it.
+
 os.environ.pop("SPARK_HOME", None)
+for _var in ("HADOOP_CONF_DIR", "YARN_CONF_DIR"):
+    os.environ.pop(_var, None)
 
 from dotenv import load_dotenv
 from pymongo import MongoClient
@@ -29,6 +30,7 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB = os.getenv("MONGO_DB", "anime_db")
 RAW_COLLECTION = os.getenv("MONGO_RAW_COLLECTION", "anime_raw")
 AGG_COLLECTION = os.getenv("MONGO_AGG_COLLECTION", "anime_agg")
+CHECKPOINT_DIR = "file://" + os.path.abspath("checkpoints/anime")
 
 schema = StructType([
     StructField("timestamp", StringType()),
@@ -111,6 +113,7 @@ def main():
         SparkSession.builder.appName("AnimeKafkaToMongo")
         .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1")
         .config("spark.sql.shuffle.partitions", "2")
+        .config("spark.hadoop.fs.defaultFS", "file:///")
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("WARN")
@@ -132,7 +135,7 @@ def main():
 
     query = (
         parsed.writeStream.foreachBatch(write_batch)
-        .option("checkpointLocation", "./checkpoints/anime")
+        .option("checkpointLocation", CHECKPOINT_DIR)
         .trigger(processingTime="10 seconds")
         .start()
     )
