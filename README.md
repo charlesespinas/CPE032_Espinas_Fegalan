@@ -1,83 +1,40 @@
-# 🚀 Streaming Data Dashboard: Project Guide
+# 🎌 Anime Streaming Dashboard
 
-This project requires building a big data streaming dashboard using **Kafka** and **Streamlit**, featuring separate real-time and historical data views.
+**Pipeline:** Jikan API → Kafka Producer → Kafka → Spark Structured Streaming → MongoDB → Streamlit
 
-## 🎯 Architecture & Components
+| View | Flow |
+| --- | --- |
+| Real-time | Kafka → Streamlit (live consumer, auto-refresh 5–60 s) |
+| Historical | Kafka → Spark → MongoDB → Streamlit (filters, aggregation, export) |
 
-A **dual-pipeline** architecture separates live streaming from long-term storage and analysis.
+## Data
+Source: https://docs.api.jikan.moe/ (`/top/anime`, `/seasons/now`). Each API item becomes one message per metric
+(`score, scored_by, rank, popularity, members, favorites`) using the required schema
+`timestamp, value, metric_type, sensor_id` plus `title, genres, anime_type, status, year, episodes`.
 
-| Pipeline | Flow | Output |
-| :--- | :--- | :--- |
-| **Real-time** | Kafka $\rightarrow$ Streamlit (Live Consumer) | `📈 Real-time Streaming View` |
-| **Historical** | Kafka $\rightarrow$ **HDFS OR MongoDB** $\rightarrow$ Streamlit (Query) | `📊 Historical Data View` |
+## Setup
+```bash
+conda create -n bigdata python=3.10.13
+conda activate bigdata
+pip install -r requirements.txt
+cp .env.example .env
+docker compose up -d          # Kafka + MongoDB (or use your own installs)
+```
+Spark 3.5 needs Java 8/11/17 (check with `java -version`). No separate Spark install is needed: `pyspark==3.5.1` comes from requirements.txt.
 
-### Mandatory Components
-* Kafka Producer/Consumer.
-* **HDFS or MongoDB** integration.
-* Two-page Streamlit dashboard with charts.
-* Robust error handling.
+## Run (4 terminals)
+```bash
+python producer.py --interval 10 --source top
+python spark_consumer.py   # uses pip pyspark 3.5.1 + Kafka connector (downloaded on first run)
+streamlit run app.py
+```
 
----
+## Features
+- Live dashboard (top-N bar, score vs members scatter, per-anime trend)
+- Full history in MongoDB with time-range / metric / anime filters
+- Aggregation: Spark (per-batch metric stats, genre avg score) + hourly/daily/weekly in dashboard
+- Export CSV, Excel (.xlsx), PDF
+- Error handling: API retries/429 back-off, Kafka/Mongo connection errors shown in UI
 
-## 💻 Technical Implementation Tasks
-
-### 1. Data Producer (`producer.py`)
-Create a Kafka Producer that fetches real data from an **existing Application Programming Interface (API)** (e.g., a public weather API, stock market API, etc.).
-
-**Required Data Schema Fields:**
-* `timestamp` (ISO format)
-* `value` (Numeric)
-* `metric_type` (String)
-* `sensor_id` (String)
-
-### 2. Dashboard (`app.py`)
-Implement the Streamlit logic:
-* `consume_kafka_data()`: Real-time processing.
-* `query_historical_data()`: Data retrieval from storage.
-* Create interactive widgets (filters, time-range selector) for the Historical View.
-
-### 3. Storage Integration
-Implement data writing and querying for **ONE** of the following: **HDFS** or **MongoDB**.
-
----
-
-## 🏃‍♂️ Setup & Execution
-
-### Prerequisites
-Python 3.8+, Apache Kafka, HDFS **OR** MongoDB.
-
-### Setup
-1. **Setup environment**
-    - Download miniconda
-    - Create your python environment
-    ```bash
-    conda create -n bigdata python=3.10.13
-    ```
-2.  **Clone Repo & Install:**
-    ```bash
-    git clone [REPO_URL]
-    conda activate bigdata
-    pip install -r requirements.txt
-    ```
-3.  **Configure:** Set up Kafka and your chosen Storage System.
-4.  **Optional Environment File (`.env`):** Use for connection details.
-
-### Execution
-1.  **Start Kafka Broker** (and Controller).
-2.  **Start Producer:**
-    ```bash
-    python producer.py
-    ```
-3.  **Launch Dashboard:**
-    ```bash
-    streamlit run app.py
-    ```
-
----
-
-## 📦 Deliverables
-Submit the following files:
-* `app.py`
-* `producer.py`
-* `requirements.txt`
-* `README.md`
+## Files
+`app.py`, `producer.py`, `spark_consumer.py`, `requirements.txt`, `README.md`, `.env.example`, `docker-compose.yml`
