@@ -1,6 +1,6 @@
 streamlit>=1.50.0
 streamlit-autorefresh
-pandas>=2.0.0
+pandas==2.0.0
 numpy>=1.24.0
 plotly>=5.15.0
 kafka-python>=2.0.2

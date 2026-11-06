@@ -153,7 +153,11 @@ def consume_kafka_data(config) -> pd.DataFrame:
 @st.cache_resource(show_spinner=False)
 def get_mongo(uri: str):
     client = MongoClient(uri, serverSelectionTimeoutMS=3000)
-    client.admin.command("ping")
+    try:
+        client.admin.command("ping")
+    except Exception:
+        client.close()
+        raise
     return client
 
 

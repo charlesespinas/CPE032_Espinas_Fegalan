@@ -63,6 +63,9 @@ class JikanClient:
         data = self.get("/seasons/now", {"page": page, "limit": limit})
         return data.get("data", []) if data else []
 
+    def close(self):
+        self.session.close()
+
 
 class StreamingDataProducer:
     def __init__(self, bootstrap_servers: str, topic: str, source: str = "top", bases=None):
@@ -174,6 +177,7 @@ class StreamingDataProducer:
                 print("Kafka producer closed")
             except Exception as e:
                 print(f"Error closing producer: {e}")
+        self.api.close()
 
 
 def parse_arguments():

@@ -57,55 +57,54 @@ def write_batch(batch_df, batch_id: int):
         return
 
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    db = client[MONGO_DB]
-    now = datetime.utcnow()
+    try:
+        db = client[MONGO_DB]
+        now = datetime.utcnow()
 
-    # 1) Raw history
-    raw_docs = []
-    for row in batch_df.collect():
-        d = row.asDict()
-        try:
-            d["timestamp"] = parse_ts(d["timestamp"])
-        except (TypeError, ValueError):
-            continue
-        raw_docs.append(d)
-    if raw_docs:
-        db[RAW_COLLECTION].insert_many(raw_docs)
+        raw_docs = []
+        for row in batch_df.collect():
+            d = row.asDict()
+            try:
+                d["timestamp"] = parse_ts(d["timestamp"])
+            except (TypeError, ValueError):
+                continue
+            raw_docs.append(d)
+        if raw_docs:
+            db[RAW_COLLECTION].insert_many(raw_docs)
 
-    # 2) Aggregation by metric_type (Spark)
-    metric_agg = (
-        batch_df.groupBy("metric_type")
-        .agg(
-            F.count("*").alias("count"),
-            F.round(F.avg("value"), 3).alias("avg"),
-            F.min("value").alias("min"),
-            F.max("value").alias("max"),
+        metric_agg = (
+            batch_df.groupBy("metric_type")
+            .agg(
+                F.count("*").alias("count"),
+                F.round(F.avg("value"), 3).alias("avg"),
+                F.min("value").alias("min"),
+                F.max("value").alias("max"),
+            )
+            .collect()
         )
-        .collect()
-    )
-    agg_docs = [
-        {"kind": "metric", "batch_id": batch_id, "batch_time": now, **r.asDict()}
-        for r in metric_agg
-    ]
+        agg_docs = [
+            {"kind": "metric", "batch_id": batch_id, "batch_time": now, **r.asDict()}
+            for r in metric_agg
+        ]
 
-    # 3) Aggregation: average score per genre (Spark)
-    genre_agg = (
-        batch_df.filter(F.col("metric_type") == "score")
-        .withColumn("genre", F.explode(F.split("genres", ", ")))
-        .filter(F.col("genre") != "")
-        .groupBy("genre")
-        .agg(F.count("*").alias("count"), F.round(F.avg("value"), 3).alias("avg_score"))
-        .collect()
-    )
-    agg_docs += [
-        {"kind": "genre", "batch_id": batch_id, "batch_time": now, **r.asDict()}
-        for r in genre_agg
-    ]
-    if agg_docs:
-        db[AGG_COLLECTION].insert_many(agg_docs)
+        genre_agg = (
+            batch_df.filter(F.col("metric_type") == "score")
+            .withColumn("genre", F.explode(F.split("genres", ", ")))
+            .filter(F.col("genre") != "")
+            .groupBy("genre")
+            .agg(F.count("*").alias("count"), F.round(F.avg("value"), 3).alias("avg_score"))
+            .collect()
+        )
+        agg_docs += [
+            {"kind": "genre", "batch_id": batch_id, "batch_time": now, **r.asDict()}
+            for r in genre_agg
+        ]
+        if agg_docs:
+            db[AGG_COLLECTION].insert_many(agg_docs)
 
-    client.close()
-    print(f"[batch {batch_id}] raw={len(raw_docs)} agg={len(agg_docs)} -> MongoDB")
+        print(f"[batch {batch_id}] raw={len(raw_docs)} agg={len(agg_docs)} -> MongoDB")
+    finally:
+        client.close()
 
 
 def main():
