@@ -1,9 +1,9 @@
 streamlit>=1.50.0
 streamlit-autorefresh
-pandas==2.0.0
+pandas>=2.0.0
 numpy>=1.24.0
 plotly>=5.15.0
-kafka-python>=2.0.2
+kafka-python==2.0.2
 python-dateutil>=2.8.2
 requests>=2.31.0
 python-dotenv>=1.0.0

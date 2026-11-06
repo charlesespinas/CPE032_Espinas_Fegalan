@@ -149,7 +149,7 @@ def consume_kafka_data(config) -> pd.DataFrame:
     return pd.DataFrame(st.session_state.live_buffer)
 
 
-# ============================================================ MongoDB (history)
+# MongoDB (history)
 @st.cache_resource(show_spinner=False)
 def get_mongo(uri: str):
     client = MongoClient(uri, serverSelectionTimeoutMS=3000)
@@ -199,7 +199,7 @@ def aggregate_data(df: pd.DataFrame, level: str) -> pd.DataFrame:
     return out.rename(columns={"mean": "value"})
 
 
-# ================================================================== exports
+# exports
 def to_excel_bytes(df: pd.DataFrame) -> bytes:
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
